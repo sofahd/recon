@@ -1,8 +1,8 @@
 from configparser import ConfigParser
 from typing import Optional, Union
 import subprocess, os
-from recon.utils.utils import load_var_from_config_and_validate, save_list_to_file, remove_multiple_substrings_from_string
-from recon.utils.exceptions import MasscanFailedException, NmapFailedException
+from utils.utils import load_var_from_config_and_validate, save_list_to_file, remove_multiple_substrings_from_string
+from utils.exceptions import MasscanFailedException, NmapFailedException
 
 
 
@@ -152,10 +152,11 @@ class PortScan:
                 service_version = line.split(' ')[3]
             
             if line.startswith("|_banner: "):
-                banner = line.removeprefix("|_banner: ").replace("\n", "")
+                banner = "b" + line.removeprefix("|_banner: ").replace("\n", "")
+                
             
             elif line.startswith("|_http-server-header: "):
-                banner = line.removeprefix("|_http-server-header: ").replace("\n", "")
+                banner = "h" + line.removeprefix("|_http-server-header: ").replace("\n", "")
 
             if service_version != None and banner != None:
                 ret_tuple = (service_version, banner)
@@ -200,9 +201,16 @@ class PortScan:
         for ip in dict_to_scan.keys():
             for port in dict_to_scan[ip].keys():
                 service_version, banner = self._nmap(ip_address=ip, port=port)
+                if banner != None:
+                    mode = banner[0]
+                    banner = banner[1:]
+                    if mode == "b":
+                        dict_to_scan[ip][port]["mode"] = "banner"
+                    elif mode == "h":
+                        dict_to_scan[ip][port]["mode"] = "http-header"
                 dict_to_scan[ip][port]["service_version"] = service_version
                 dict_to_scan[ip][port]["banner"] = banner
-        
+                
         return dict_to_scan
 
 
