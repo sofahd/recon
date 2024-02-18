@@ -1,7 +1,7 @@
 from iot_tools.port_scan import PortScan
 from iot_tools.api_crawler import ApiCrawler
 from utils.utils import load_config
-import logging, sys
+import logging, sys, json
 from typing import Union, Optional
 
 class IotRecon:
@@ -69,6 +69,7 @@ class IotRecon:
              ip_address:Union[str, list[str]],
              endpoints:dict,
              output_path:str,
+             save_output:bool = True,
              crawl_ports:Optional[Union[list[int],int]] = None,
              excl_ports:Optional[Union[int, list[int]]] = None
             ) -> dict:
@@ -78,6 +79,7 @@ class IotRecon:
         2. identify the API-endpoints of the IoT-devices where apis are likely served
         3. crawl the API-endpoints of the identified ports on the given devices
 
+        ---
         The endpoints should be specified as a dictionary looking like this:
         ```py
         endpoints = {
@@ -93,12 +95,16 @@ class IotRecon:
             }
         }
         ```
+
+        ---
         :param ip_address: The IP-address, or list of IP-addresses to scan.
         :type ip_address: Union[str, list[str]]
         :param endpoints: The endpoints dict, containing the endpoints to crawl.
         :type endpoints: dict
         :param output_path: The path to save the output to.
         :type output_path: str
+        :param save_output: Optional argument, where you can specify if the resulting dict should be saved to files (one per IP-address) in the output_path. Default is True.
+        :type save_output: bool
         :param crawl_ports: Optional argument, where you can specify port(s) that **MUST** be crawled. If you specify a port here, it will be crawled even if it is not open.
         :type crawl_ports: Union[list[int],int]
         :param excl_ports: Optional argument, where you can specify port(s) that **MUST NOT** be scanned. Because only open ports get crawled, this argument will also exclude ports from being crawled (if they aren't specified in the `crawl_ports` argument)
@@ -121,10 +127,16 @@ class IotRecon:
             raise TypeError(f"excl_ports must be of type int or list[int]")
         
         port_scan_res = self._port_scan(ip_address=ip_address, excl_ports=excl_ports)
+        
         for ip in port_scan_res.keys():
             ports = list(port_scan_res[ip].keys())
             ports.extend(crawl_ports)
             for port in ports:
                 port_scan_res[ip][port]["endpoints"] = self._crawl_api(ip_address=ip, port=port, endpoints=endpoints, output_path=output_path)
+        
+        if save_output:
+            for ip in port_scan_res.keys():
+                with open(f"{output_path}/{ip}.json", "w") as file:
+                    file.write(json.dumps(port_scan_res[ip], indent=4))
 
         return port_scan_res
