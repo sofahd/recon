@@ -1,6 +1,6 @@
-from recon.iot_tools.port_scan import PortScan
-from recon.iot_tools.api_crawler import ApiCrawler
-from recon.utils.utils import load_config
+from iot_tools.port_scan import PortScan
+from iot_tools.api_crawler import ApiCrawler
+from utils.utils import load_config
 import logging, sys
 from typing import Union, Optional
 
@@ -121,7 +121,6 @@ class IotRecon:
             raise TypeError(f"excl_ports must be of type int or list[int]")
         
         port_scan_res = self._port_scan(ip_address=ip_address, excl_ports=excl_ports)
-        
         for ip in port_scan_res.keys():
             ports = list(port_scan_res[ip].keys())
             ports.extend(crawl_ports)
