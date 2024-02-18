@@ -1,5 +1,5 @@
 from configparser import ConfigParser
-from recon.utils.utils import load_var_from_config_and_validate
+from utils.utils import load_var_from_config_and_validate
 import requests, copy
 
 class ApiCrawler:
@@ -91,12 +91,11 @@ class ApiCrawler:
                 ret_dict[endpoint]['path'] = f"{output_path}/{ip_address}_{port}_{endpoint_dict['num']}.html"
                 ret_dict[endpoint].pop('expected_status_code', None)
                 ret_dict[endpoint]['status_code'] = response.status_code
-                ret_dict[endpoint]['headers'] = response.headers
+                ret_dict[endpoint]['headers'] = dict(response.headers)
 
             else:
                 self.log.error(f'Invalid response from {request_url}')
                 ret_dict.pop(endpoint, None)
-
         return ret_dict
     
         
