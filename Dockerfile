@@ -19,6 +19,6 @@ RUN apt -y update && \
     beautifulsoup4 && \
     pip3 install git+https://$TOKEN:x-oauth-basic@github.com/sofahd/sofahutils.git
 
-WORKDIR /home/api
+WORKDIR /home/pro
 
 CMD python3 /home/pro/startup.py
