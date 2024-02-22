@@ -4,6 +4,7 @@ from utils.utils import load_config
 import json
 from typing import Union, Optional
 from sofahutils import SofahLogger
+from ast import literal_eval
 
 class IotRecon:
     """
@@ -146,7 +147,7 @@ class IotRecon:
         :return: a dict containing all the results of the scan
         """
 
-        ip_addresses = self.config.get(section="Scan", option="ip_addresses")
+        ip_addresses = literal_eval(self.config.get(section="Scan", option="ip_addresses"))
         
         try: 
             with open("/home/pro/data/endpoints.json", "r") as file:
@@ -154,7 +155,7 @@ class IotRecon:
         except Exception as e:
             self.log.error(f"Error during loading of endpoints.json: {str(e)}")
 
-        crawl_ports = self.config.get(section="Scan", option="crawl_ports")
-        excl_ports = self.config.get(section="Scan", option="excl_ports")
+        crawl_ports = literal_eval(self.config.get(section="Scan", option="crawl_ports"))
+        excl_ports = literal_eval(self.config.get(section="Scan", option="excl_ports"))
 
         return self.scan(ip_address=ip_addresses, endpoints=endpoints, output_path="/home/pro/data", crawl_ports=crawl_ports, excl_ports=excl_ports)
