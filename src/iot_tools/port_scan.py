@@ -73,7 +73,7 @@ class PortScan:
 
         save_list_to_file(input_list=ip_address, filepath=input_file_path)
         ## TODO: Adjust the ports to scan
-        masscan = subprocess.run(f"masscan -iL {input_file_path} -p 80,8080,443,22,21,49123,53301 -oG {masscan_output_path} --rate {self.rate}",shell=True, capture_output=True)
+        masscan = subprocess.run(f"masscan -iL {input_file_path} -p 0-65535 -oG {masscan_output_path} --rate {self.rate}",shell=True, capture_output=True)
         
         if masscan.returncode != 0:
             raise MasscanFailedException(f"Masscan with input file: '{input_file_path}' failed! Error: {masscan.stderr}")
