@@ -3,6 +3,7 @@ from iot_tools.api_crawler import ApiCrawler
 from utils.utils import load_config
 import logging, sys, json
 from typing import Union, Optional
+from sofahutils import SofahLogger
 
 class IotRecon:
     """
@@ -12,22 +13,14 @@ class IotRecon:
     def __init__(self, path:str):
         """
         Constructor for IotRecon class.
+
+        ---
+        :param path: The path to the config-file.
+        :type path: str
         """
 
         self.config = load_config(path)
-        self.log = logging.Logger("IotRecon")
-        self.log.setLevel(logging.INFO)  # Set the logging level as needed
-
-        # Create a handler that writes log messages to stdout
-        handler = logging.StreamHandler(sys.stdout)
-
-        # Optionally, set a formatter for the handler
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-
-        # Add the handler to the logger
-        self.log.addHandler(handler)
-
+        self.log = SofahLogger(url="http://log_api:50005")
 
     
     def _port_scan(self, ip_address:Union[str, list[str]], excl_ports:list[int] = None) -> dict:
