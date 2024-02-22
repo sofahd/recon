@@ -11,17 +11,19 @@ class IotRecon:
     Class used for Reconnaissance on IOT-devices.
     """
 
-    def __init__(self, path:str):
+    def __init__(self, path:str, log_url:str):
         """
         Constructor for IotRecon class.
 
         ---
         :param path: The path to the config-file.
         :type path: str
+        :param log_url: The URL of the log-api.
+        :type log_url: str
         """
 
         self.config = load_config(path)
-        self.log = SofahLogger(url="http://log_api:50005")
+        self.log = SofahLogger(url=log_url)
 
     
     def _port_scan(self, ip_address:Union[str, list[str]], excl_ports:list[int] = None) -> dict:

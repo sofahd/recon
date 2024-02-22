@@ -1,6 +1,9 @@
 FROM ubuntu:latest
 ARG TOKEN
+ARG LOG_API
 
+# Set environment variables
+ENV LOG_API=$LOG_API
 # Copy files
 COPY ./src /home/pro/
 
