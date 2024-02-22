@@ -1,7 +1,7 @@
 from iot_tools.port_scan import PortScan
 from iot_tools.api_crawler import ApiCrawler
 from utils.utils import load_config
-import logging, sys, json
+import json
 from typing import Union, Optional
 from sofahutils import SofahLogger
 
@@ -133,3 +133,28 @@ class IotRecon:
                     file.write(json.dumps(port_scan_res[ip], indent=4))
 
         return port_scan_res
+    
+
+    def scan_from_config(self) -> dict:
+        """
+        This Method is designed to:
+        1. scan a (number of) IP-Adress(es) for open ports
+        2. identify the API-endpoints of the IoT-devices where apis are likely served
+        3. crawl the API-endpoints of the identified ports on the given devices
+
+        ---
+        :return: a dict containing all the results of the scan
+        """
+
+        ip_addresses = self.config.get(section="Scan", option="ip_addresses")
+        
+        try: 
+            with open("/home/pro/data/endpoints.json", "r") as file:
+                endpoints = json.load(file)
+        except Exception as e:
+            self.log.error(f"Error during loading of endpoints.json: {str(e)}")
+
+        crawl_ports = self.config.get(section="Scan", option="crawl_ports")
+        excl_ports = self.config.get(section="Scan", option="excl_ports")
+
+        return self.scan(ip_address=ip_addresses, endpoints=endpoints, output_path="/home/pro/data", crawl_ports=crawl_ports, excl_ports=excl_ports)
