@@ -51,7 +51,7 @@ class ApiCrawler:
         :return: dict, containing the crawled endpoints.
         """
 
-        self.log.info(f'Crawling API of {ip_address}:{port}')
+        self.log.info(f'Crawling API of {ip_address}:{port}', method="recon.ApiCrawler.crawl")
         ret_dict = {}
 
         ret_dict = self._request_endpoints(endpoints, ret_dict, ip_address, port, output_path) 
@@ -86,12 +86,12 @@ class ApiCrawler:
                     )
 
                 else:
-                    self.log.error(f'Invalid method: {endpoint_dict["method"]} for url: {request_url}')
+                    self.log.error(f'Invalid method: {endpoint_dict["method"]} for url: {request_url}', method="recon.ApiCrawler._request_endpoints")
                     ret_dict.pop(endpoint, None)
                     continue
                 
             except Exception as e:
-                self.log.error(f'Exception: {e} for url: {request_url}')
+                self.log.error(f'Exception: {e} for url: {request_url}', method="recon.ApiCrawler._request_endpoints")
                 ret_dict.pop(endpoint, None)
                 continue
 
@@ -123,7 +123,7 @@ class ApiCrawler:
 
 
             else:
-                self.log.error(f'Invalid response from {request_url}')
+                self.log.error(f'Invalid response from {request_url}', method="recon.ApiCrawler._request_endpoints")
                 ret_dict.pop(endpoint, None)
         
         return ret_dict

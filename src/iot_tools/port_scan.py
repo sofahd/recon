@@ -66,13 +66,12 @@ class PortScan:
         :return: a parsed dict with all gathered information
         """
 
-        self.log.info(f"Starting the initial Masscan with {len(ip_address)} IP-addresses, while excluding {len(excl_ports)} ports.")
+        self.log.info(f"Starting the initial Masscan with {len(ip_address)} IP-addresses, while excluding {len(excl_ports)} ports.", method="recon.PortScan._masscan")
         
         input_file_path = os.getcwd() + "/masscan_input.txt"
         masscan_output_path = os.getcwd() + "/masscan_out.txt"
 
         save_list_to_file(input_list=ip_address, filepath=input_file_path)
-        ## TODO: Adjust the ports to scan
         masscan = subprocess.run(f"masscan -iL {input_file_path} -p 0-65535 -oG {masscan_output_path} --rate {self.rate}",shell=True, capture_output=True)
         
         if masscan.returncode != 0:
@@ -83,7 +82,7 @@ class PortScan:
         os.remove(input_file_path)
         os.remove(masscan_output_path)
         
-        self.log.info("Initial Masscan ran successful!")
+        self.log.info("Initial Masscan ran successful!", method="recon.PortScan._masscan")
 
         return parsed_dict 
         
@@ -135,7 +134,7 @@ class PortScan:
         
         ret_tuple = (None, None)
 
-        self.log.info(f"Starting nmap scan on {ip_address}:{port}!")
+        self.log.info(f"Starting nmap scan on {ip_address}:{port}!", method="recon.PortScan._nmap")
 
         nmap = subprocess.run(f"nmap {ip_address} --script=banner -sV -p {port} -oN {os.getcwd()}/nmap_out.txt", shell=True, capture_output=True)
        
