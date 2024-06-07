@@ -4,6 +4,8 @@ ARG LOG_API
 
 # Set environment variables
 ENV LOG_API=$LOG_API
+run export DEBIAN_FRONTEND=noninteractive
+
 # Copy files
 COPY ./src /home/pro/
 
@@ -16,9 +18,9 @@ RUN apt -y update && \
     masscan \
     git \
     nmap \
-    python3-dev && \
-    mkdir /home/pro/data && \
-    pip3 install setuptools \
+    python3-dev
+RUN mkdir /home/pro/data
+RUN pip3 install setuptools \
     beautifulsoup4 && \
     pip3 install git+https://$TOKEN:x-oauth-basic@github.com/sofahd/sofahutils.git
 
