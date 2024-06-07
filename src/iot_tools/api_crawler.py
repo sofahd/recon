@@ -68,7 +68,7 @@ class ApiCrawler:
         for endpoint in endpoints.keys():
             
             endpoint_dict = endpoints[endpoint]
-            request_url = f'http://{ip_address}:{port}{endpoint}'
+            request_url = f'https://{ip_address}:{port}{endpoint}' if port == 443 else f'http://{ip_address}:{port}{endpoint}'
             
             data = endpoint_dict.get('data')
 
@@ -76,13 +76,15 @@ class ApiCrawler:
                 if endpoint_dict["method"] == 'GET':
                     response = requests.get(
                         url=request_url,
-                        data=data
+                        data=data,
+                        verify=False
                     )
 
                 elif endpoint_dict['method'] == 'POST':
                     response = requests.post(
                         url=request_url,
-                        data=data
+                        data=data,
+                        verify=False
                     )
 
                 else:
