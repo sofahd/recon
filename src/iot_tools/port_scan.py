@@ -1,6 +1,6 @@
 from configparser import ConfigParser
 from typing import Optional, Union
-import subprocess, os
+import subprocess, os, time, select
 from utils.utils import load_var_from_config_and_validate, save_list_to_file, remove_multiple_substrings_from_string
 from utils.exceptions import MasscanFailedException, NmapFailedException
 
@@ -72,11 +72,36 @@ class PortScan:
         masscan_output_path = os.getcwd() + "/masscan_out.txt"
 
         save_list_to_file(input_list=ip_address, filepath=input_file_path)
-        masscan = subprocess.run(f"masscan -iL {input_file_path} -p 0-65535 -oG {masscan_output_path} --rate {self.rate}",shell=True, capture_output=True)
+
+        command = ["masscan", "-iL", input_file_path, "-p", "0-65535", "-oG", masscan_output_path, "--rate", self.rate]
+        masscan = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         
-        if masscan.returncode != 0:
-            raise MasscanFailedException(f"Masscan with input file: '{input_file_path}' failed! Error: {masscan.stderr}")
-        
+        check_interval = 1
+
+        try:
+            while True:
+                lines = self._masscan_read_subprocess_output(masscan.stderr)
+                line = lines[-1] if lines else ""
+                line = line.rstrip()
+                if line != "":
+                    self.log.info(f"Masscan: {line}", method="recon.PortScan._masscan")
+                if (masscan.poll() is not None):
+                    break
+                if "waiting -" in line:
+                    self.log.warn("Masscan is running endlessly, but we will kill it.", method="recon.PortScan._masscan")
+                    masscan.kill()
+                    break
+                time.sleep(check_interval)
+        finally:
+            if masscan.returncode != 0 and masscan.returncode != -9:
+                errormsg = f"Error with masscan, returncode: {masscan.returncode}, line: {line}"
+                self.log.error(errormsg, method="recon.PortScan._masscan")
+                raise MasscanFailedException(f"Masscan with input file: '{input_file_path}' failed! Error: {errormsg}")
+            if masscan.returncode == -9:
+                self.log.warn("Masscan was killed!", method="recon.PortScan._masscan")
+            masscan.stdout.close()
+            masscan.stderr.close()
+       
         parsed_dict = self._parse_masscan_output(masscan_output_path=masscan_output_path)
 
         os.remove(input_file_path)
@@ -86,6 +111,24 @@ class PortScan:
 
         return parsed_dict 
         
+    def _masscan_read_subprocess_output(self, pipe)->list[str]:
+        """
+        Read the output from the masscan subprocess.
+        :param pipe: The pipe to read from.
+        :return: The output.
+        """
+
+        output = []
+        while True:
+            ready_to_read, _, _ = select.select([pipe], [], [], 0.1)
+            if not ready_to_read:
+                break
+            line = pipe.readline()
+            if not line:
+                break
+            output.append(line)
+        return output
+
     
     def _parse_masscan_output(self, masscan_output_path:str)->dict:
         """
@@ -115,7 +158,8 @@ class PortScan:
                     out_dict[ip] = {port: {"protocol": protocol, "timestamp": timestamp}}
                 else:
                     out_dict[ip][port] = {"protocol": protocol, "timestamp": timestamp}
-
+        if out_dict == {}:
+            self.log.warn("Masscan did not find any open ports!, This means probably something went wrong!", method="recon.PortScan._parse_masscan_output")
         return out_dict
     
 
