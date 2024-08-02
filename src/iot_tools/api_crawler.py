@@ -96,8 +96,20 @@ class ApiCrawler:
                 self.log.error(f'Exception: {e} for url: {request_url}', method="recon.ApiCrawler._request_endpoints")
                 ret_dict.pop(endpoint, None)
                 continue
+            
+            expected_status_code = endpoint_dict.get('expected_status_code')
+            if expected_status_code is None:
+                expected_status_code = endpoint_dict.get('status_code')
+                if expected_status_code is None:
+                    expected_status_code = 200
+                    self.log.warn(f'No expected status code for {request_url}, setting it to 200', method="recon.ApiCrawler._request_endpoints")
+            if isinstance(expected_status_code, list) and expected_status_code != []:
+                if response.status_code in expected_status_code:
+                    expected_status_code = response.status_code
+                else:
+                    expected_status_code = expected_status_code[0]
 
-            if response.status_code == endpoint_dict.get('expected_status_code') or response.status_code == endpoint_dict.get('status_code'):
+            if response.status_code == expected_status_code:
                 self.log.info(f'Valid response from {request_url}')
                 
                 with open(f"{output_path}/{ip_address}_{port}_{endpoint_dict['num']}.html", 'wb') as f:
