@@ -4,7 +4,7 @@ ARG LOG_API
 
 # Set environment variables
 ENV LOG_API=$LOG_API
-run export DEBIAN_FRONTEND=noninteractive
+RUN export DEBIAN_FRONTEND=noninteractive
 
 # Copy files
 COPY ./src /home/pro/
