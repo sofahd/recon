@@ -46,9 +46,9 @@ class PortScan:
         masscan_res = self._masscan(ip_address=ip_address, excl_ports=excl_ports)
 
         for ip in masscan_res.keys():
-            for port in masscan_res[ip].keys():
-                if port in excl_ports:
-                    del masscan_res[ip][port]
+            ports_to_delete = [port for port in masscan_res[ip] if port in excl_ports]
+            for port in ports_to_delete:
+                del masscan_res[ip][port]
         
         nmap_res = self._nmap_runner(dict_to_scan=masscan_res)
 
