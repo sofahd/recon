@@ -19,7 +19,7 @@ class ApiCrawler:
         self.config = config
         
 
-    def crawl(self, ip_address:str, port:int, endpoints:dict, output_path:str) -> dict:
+    def crawl(self, ip_address:str, port:int, endpoints:dict, output_path:str, service_version:str) -> dict:
         """
         Crawl the API of an IoT device.
 
@@ -48,17 +48,19 @@ class ApiCrawler:
         :type endpoints: dict
         :param output_path: The path to save the output to.
         :type output_path: str
+        :param service_version: The version of the service running on the port.
+        :type service_version: str
         :return: dict, containing the crawled endpoints.
         """
 
         self.log.info(f'Crawling API of {ip_address}:{port}', method="recon.ApiCrawler.crawl")
         ret_dict = {}
 
-        ret_dict = self._request_endpoints(endpoints, ret_dict, ip_address, port, output_path) 
+        ret_dict = self._request_endpoints(endpoints, ret_dict, ip_address, port, output_path, service_version) 
 
         return ret_dict
     
-    def _request_endpoints(self, endpoints:dict, ret_dict:dict, ip_address:str, port:int, output_path:str) -> dict:
+    def _request_endpoints(self, endpoints:dict, ret_dict:dict, ip_address:str, port:int, output_path:str, service_version:str) -> dict:
         """
         Request the endpoints from the IoT device.
         """
@@ -68,7 +70,10 @@ class ApiCrawler:
         for endpoint in endpoints.keys():
             
             endpoint_dict = endpoints[endpoint]
-            request_url = f'https://{ip_address}:{port}{endpoint}' if port == 443 else f'http://{ip_address}:{port}{endpoint}'
+            if service_version == "":
+                self.log.warn(f'No service version provided for {ip_address}:{port}, defaulting to portmatching', method="recon.ApiCrawler._request_endpoints")
+                service_version = "ssl/http" if port == 443 else "http"
+            request_url = f'https://{ip_address}:{port}{endpoint}' if service_version == "ssl/http" else f'http://{ip_address}:{port}{endpoint}'
             
             data = endpoint_dict.get('data')
 
@@ -132,7 +137,7 @@ class ApiCrawler:
                             }
                             count += 1
 
-                    self._request_endpoints(further_endpoints_dict, ret_dict, ip_address, port, output_path)
+                    self._request_endpoints(further_endpoints_dict, ret_dict, ip_address, port, output_path, service_version)
 
 
 
@@ -173,6 +178,7 @@ class ApiCrawler:
                 url = element[attribute]
                 absolute_url = urljoin(base_url, url)  # Ensure the URL is absolute
                 if urlparse(absolute_url).netloc == domain and "/" in url:
+                    url = url.removeprefix(".")
                     urls.add(url)
 
         return list(urls)

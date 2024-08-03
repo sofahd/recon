@@ -41,7 +41,7 @@ class IotRecon:
         return port_scan.scan(ip_address=ip_address, excl_ports=excl_ports)
         
         
-    def _crawl_api(self, ip_address:str, port:int, endpoints:dict, output_path:str) -> None:
+    def _crawl_api(self, ip_address:str, port:int, endpoints:dict, output_path:str, service_version:str = "") -> None:
         """
         Crawl the API of an IoT device.
 
@@ -53,12 +53,14 @@ class IotRecon:
         :type endpoints: dict
         :param output_path: The path to save the output to.
         :type output_path: str
+        :param service_version: The version of the service running on the port.
+        :type service_version: str
         :return:
         """
 
         api_crawler = ApiCrawler(config=self.config, logger=self.log)
         
-        return api_crawler.crawl(ip_address=ip_address, port=port, endpoints=endpoints, output_path=output_path)
+        return api_crawler.crawl(ip_address=ip_address, port=port, endpoints=endpoints, output_path=output_path, service_version=service_version)
     
     
     def scan(self,
@@ -128,7 +130,7 @@ class IotRecon:
             ports = list(port_scan_res[ip].keys())
             ports.extend(crawl_ports)
             for port in ports:
-                port_scan_res[ip][port]["endpoints"] = self._crawl_api(ip_address=ip, port=port, endpoints=endpoints, output_path=output_path)
+                port_scan_res[ip][port]["endpoints"] = self._crawl_api(ip_address=ip, port=port, endpoints=endpoints, output_path=output_path, service_version=port_scan_res[ip][port].get("service_version"))
         
         if save_output:
             for ip in port_scan_res.keys():
