@@ -21,6 +21,7 @@ RUN apt -y update && \
     python3-dev
 RUN mkdir /home/pro/data
 RUN pip3 install setuptools \
+    pyOpenSSL \
     beautifulsoup4 && \
     pip3 install git+https://$TOKEN:x-oauth-basic@github.com/sofahd/sofahutils.git
 

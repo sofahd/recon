@@ -1,5 +1,6 @@
 from iot_tools.port_scan import PortScan
 from iot_tools.api_crawler import ApiCrawler
+from iot_tools.ssl_cert_info_retriver import SslCertInfoRetriever
 from utils.utils import load_config
 import json
 from typing import Union, Optional
@@ -130,7 +131,13 @@ class IotRecon:
             ports = list(port_scan_res[ip].keys())
             ports.extend(crawl_ports)
             for port in ports:
-                port_scan_res[ip][port]["endpoints"] = self._crawl_api(ip_address=ip, port=port, endpoints=endpoints, output_path=output_path, service_version=port_scan_res[ip][port].get("service_version"))
+                service_version = port_scan_res[ip][port].get("service_version")
+                if service_version == None:
+                    service_version = "http"
+                port_scan_res[ip][port]["endpoints"] = self._crawl_api(ip_address=ip, port=port, endpoints=endpoints, output_path=output_path, service_version=service_version)
+                if "ssl" in service_version:
+                    ssl_cert_retriever = SslCertInfoRetriever(logger=self.log)
+                    port_scan_res[ip][port]["ssl"] = ssl_cert_retriever.process(ip_address=ip, port=port)
         
         if save_output:
             for ip in port_scan_res.keys():
