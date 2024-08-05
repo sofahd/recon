@@ -108,6 +108,7 @@ class ApiCrawler:
                 if expected_status_code is None:
                     expected_status_code = 200
                     self.log.warn(f'No expected status code for {request_url}, setting it to 200', method="recon.ApiCrawler._request_endpoints")
+            self.log.info(f'Expected status code: {expected_status_code}', method="recon.ApiCrawler._request_endpoints")
             if isinstance(expected_status_code, list) and expected_status_code != []:
                 if response.status_code in expected_status_code:
                     expected_status_code = response.status_code
