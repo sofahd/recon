@@ -100,7 +100,7 @@ class ApiCrawler:
                     response = requests.get(
                         url=request_url,
                         data=data,
-                        verify=False,
+                        verify=False,  # nosec B501 - IoT targets routinely serve self-signed/mismatched certs; the crawler must not verify TLS
                         timeout=REQUEST_TIMEOUT
                     )
 
@@ -108,7 +108,7 @@ class ApiCrawler:
                     response = requests.post(
                         url=request_url,
                         data=data,
-                        verify=False,
+                        verify=False,  # nosec B501 - IoT targets routinely serve self-signed/mismatched certs; the crawler must not verify TLS
                         timeout=REQUEST_TIMEOUT
                     )
 

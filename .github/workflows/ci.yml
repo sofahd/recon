@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        env:
+          SOFAH_GH_TOKEN: ${{ secrets.SOFAH_GH_TOKEN }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov ruff bandit
+          pip install beautifulsoup4 requests urllib3
+          # sofahutils is a private dependency; CI installs it with an org/repo token secret.
+          pip install "git+https://x-access-token:${SOFAH_GH_TOKEN}@github.com/sofahd/sofahutils.git"
+      - name: Lint (ruff, informational)
+        run: ruff check .
+        continue-on-error: true
+      - name: Security gate (bandit, fails on high severity, e.g. shell=True)
+        run: bandit -r src --severity-level high
+      - name: Dockerfile lint (hadolint, informational)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+        continue-on-error: true
+      - name: Tests
+        run: pytest -q
