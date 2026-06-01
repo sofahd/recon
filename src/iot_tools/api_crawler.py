@@ -1,5 +1,5 @@
 from configparser import ConfigParser
-from utils.utils import load_var_from_config_and_validate
+from sofahutils import load_var_from_config_and_validate
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 import requests, copy

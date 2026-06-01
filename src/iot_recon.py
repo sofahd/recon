@@ -1,7 +1,7 @@
 from iot_tools.port_scan import PortScan
 from iot_tools.api_crawler import ApiCrawler
 from iot_tools.ssl_cert_info_retriver import SslCertInfoRetriever
-from utils.utils import load_config
+from sofahutils import load_config
 import json, copy
 from typing import Union, Optional
 from sofahutils import SofahLogger

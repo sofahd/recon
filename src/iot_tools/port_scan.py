@@ -2,7 +2,7 @@ from configparser import ConfigParser
 from typing import Optional, Union
 import subprocess, os, time, select, json
 import xml.etree.ElementTree as ET
-from utils.utils import load_var_from_config_and_validate, save_list_to_file
+from sofahutils import load_var_from_config_and_validate, save_list_to_file
 from utils.exceptions import MasscanFailedException, NmapFailedException
 
 
