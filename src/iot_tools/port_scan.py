@@ -1,7 +1,8 @@
 from configparser import ConfigParser
 from typing import Optional, Union
-import subprocess, os, time, select
-from utils.utils import load_var_from_config_and_validate, save_list_to_file, remove_multiple_substrings_from_string
+import subprocess, os, time, select, json
+import xml.etree.ElementTree as ET
+from utils.utils import load_var_from_config_and_validate, save_list_to_file
 from utils.exceptions import MasscanFailedException, NmapFailedException
 
 
@@ -69,11 +70,11 @@ class PortScan:
         self.log.info(f"Starting the initial Masscan with {len(ip_address)} IP-addresses, while excluding {len(excl_ports)} ports.", method="recon.PortScan._masscan")
         
         input_file_path = os.getcwd() + "/masscan_input.txt"
-        masscan_output_path = os.getcwd() + "/masscan_out.txt"
+        masscan_output_path = os.getcwd() + "/masscan_out.json"
 
         save_list_to_file(input_list=ip_address, filepath=input_file_path)
 
-        command = ["masscan", "-iL", input_file_path, "-p", "0-65535", "-oG", masscan_output_path, "--rate", self.rate]
+        command = ["masscan", "-iL", input_file_path, "-p", "0-65535", "-oJ", masscan_output_path, "--rate", self.rate]
         masscan = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         
         check_interval = 1
@@ -132,35 +133,74 @@ class PortScan:
     
     def _parse_masscan_output(self, masscan_output_path:str)->dict:
         """
-        Parse the masscan output file.
+        Parse a masscan `-oJ` JSON report into ``{ip: {port: {"protocol", "timestamp"}}}``.
 
-        :param masscan_output_path: The path to the masscan output file.
+        masscan `-oJ` emits a JSON array of ``{"ip", "timestamp", "ports": [{"port", "proto",
+        "status", ...}]}`` records (``proto`` is the transport, e.g. ``tcp``). Only ``open``
+        ports are kept. ``port`` is an int key, matching what the rest of PortScan expects.
+
+        :param masscan_output_path: The path to the masscan JSON output file.
         :type masscan_output_path: str
         :return: The parsed masscan output.
         :rtype: dict
         """
-        
+
         with open(masscan_output_path, 'r') as f:
-            lines = f.readlines()
+            records = self._load_masscan_json(f.read())
 
         out_dict = {}
-            
-        for line in lines:
-            if not line.startswith('#') and not line.startswith('\n') and line.startswith("Timestamp: "):
-                tabs = line.split('\t')
-                timestamp = remove_multiple_substrings_from_string(input_string=tabs[0], substrings=["Timestamp: ", "\n", " "])
-                ip = remove_multiple_substrings_from_string(input_string=tabs[1], substrings=["Host: ", "\n", " ", "(", ")"])
-                port_and_proto = remove_multiple_substrings_from_string(input_string=tabs[2], substrings=["Ports: ", "\n", " "]).split('/', 1)
-                port = int(port_and_proto[0])
-                protocol = remove_multiple_substrings_from_string(input_string=port_and_proto[1], substrings=["\n", " ", "open/tcp", "open/udp", "//"])
-                
-                if ip not in out_dict.keys():   
-                    out_dict[ip] = {port: {"protocol": protocol, "timestamp": timestamp}}
-                else:
-                    out_dict[ip][port] = {"protocol": protocol, "timestamp": timestamp}
+
+        for record in records:
+            ip = record.get("ip")
+            if not ip:
+                continue
+            for port_entry in record.get("ports", []):
+                status = port_entry.get("status")
+                if status is not None and status != "open":
+                    continue
+                try:
+                    port = int(port_entry["port"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                out_dict.setdefault(ip, {})[port] = {
+                    "protocol": port_entry.get("proto"),
+                    "timestamp": record.get("timestamp"),
+                }
+
         if out_dict == {}:
             self.log.warn("Masscan did not find any open ports!, This means probably something went wrong!", method="recon.PortScan._parse_masscan_output")
         return out_dict
+
+    def _load_masscan_json(self, raw:str)->list:
+        """
+        Load masscan JSON output tolerantly.
+
+        masscan usually emits valid JSON, but some builds leave a trailing comma before the
+        closing bracket or omit the bracket entirely. Try a strict parse first, then fall
+        back to parsing each ``{...}`` record line individually.
+
+        :param raw: the raw file contents
+        :type raw: str
+        :return: a list of record dicts
+        :rtype: list
+        """
+
+        raw = raw.strip()
+        if not raw:
+            return []
+        try:
+            data = json.loads(raw)
+            return data if isinstance(data, list) else [data]
+        except json.JSONDecodeError:
+            records = []
+            for line in raw.splitlines():
+                line = line.strip().rstrip(",")
+                if line.startswith("{") and line.endswith("}"):
+                    try:
+                        records.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+            return records
     
 
     def _nmap(self, ip_address:str, port:int)->tuple:
@@ -176,37 +216,69 @@ class PortScan:
         :rtype: tuple
         """
         
-        ret_tuple = (None, None)
-
         self.log.info(f"Starting nmap scan on {ip_address}:{port}!", method="recon.PortScan._nmap")
 
-        nmap = subprocess.run(f"nmap {ip_address} --script=banner -sV -p {port} -oN {os.getcwd()}/nmap_out.txt", shell=True, capture_output=True)
-       
-        if nmap.returncode != 0:
-            raise NmapFailedException(f"Masscan with ip and port: '{ip_address}:{port}' failed! Error: {nmap.stderr}")
-        with open(os.getcwd() + "/nmap_out.txt", 'r') as f:
-            lines = f.readlines()
-        
-        service_version = banner = None
-        
-        for line in lines: 
-            
-            if line.startswith(str(port)) and "open" in line:
-                service_version = line.split(' ')[3]
-            
-            if line.startswith("|_banner: "):
-                banner = "b" + line.removeprefix("|_banner: ").replace("\n", "")
-                
-            
-            elif line.startswith("|_http-server-header: "):
-                banner = "h" + line.removeprefix("|_http-server-header: ").replace("\n", "")
+        output_path = os.path.join(os.getcwd(), "nmap_out.xml")
 
-            if service_version != None and banner != None:
-                ret_tuple = (service_version, banner)
-                break
-        
-        os.remove(os.getcwd() + "/nmap_out.txt")
+        nmap = subprocess.run(
+            ["nmap", ip_address, "--script=banner", "-sV", "-p", str(port), "-oX", output_path],
+            capture_output=True,
+        )
+
+        if nmap.returncode != 0:
+            raise NmapFailedException(f"nmap with ip and port: '{ip_address}:{port}' failed! Error: {nmap.stderr}")
+
+        ret_tuple = self._parse_nmap_xml(xml_path=output_path, port=port)
+
+        os.remove(output_path)
         return ret_tuple
+
+    def _parse_nmap_xml(self, xml_path:str, port:int)->tuple:
+        """
+        Parse an nmap `-oX` XML report for a single port into the (service_version, banner) tuple.
+
+        ``service_version`` is nmap's service name, prefixed with the tunnel when present
+        (e.g. ``ssl/http``), so downstream SSL detection (`"ssl" in service_version`) works.
+        ``banner`` keeps the historical one-character mode prefix: ``b`` for a raw banner
+        (``banner`` script) and ``h`` for an HTTP server header (``http-server-header`` script);
+        ``_nmap_runner`` strips that prefix to set the port_spoof mode.
+
+        :param xml_path: path to the nmap XML output file
+        :type xml_path: str
+        :param port: the port whose result should be extracted
+        :type port: int
+        :return: a tuple of (service_version, banner), either element may be None
+        :rtype: tuple
+        """
+
+        service_version = None
+        banner = None
+
+        root = ET.parse(xml_path).getroot()
+
+        for port_el in root.iter("port"):
+            if port_el.get("portid") != str(port):
+                continue
+
+            service_el = port_el.find("service")
+            if service_el is not None:
+                name = service_el.get("name")
+                tunnel = service_el.get("tunnel")
+                if name:
+                    service_version = f"{tunnel}/{name}" if tunnel else name
+
+            for script_el in port_el.findall("script"):
+                script_id = script_el.get("id")
+                output = script_el.get("output", "").replace("\n", "")
+                if script_id == "banner":
+                    banner = "b" + output
+                    break
+                elif script_id == "http-server-header":
+                    banner = "h" + output
+                    break
+            break
+
+        return (service_version, banner)
     
 
     def _nmap_runner(self, dict_to_scan:dict)->dict:

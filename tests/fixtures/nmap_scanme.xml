@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.94SVN scan initiated Mon Jun  1 10:04:17 2026 as: nmap -4 -p 22,80,9929,31337 -sV -&#45;script=banner -&#45;host-timeout 150s -oX recon/tests/fixtures/nmap_scanme.xml -oN recon/tests/fixtures/nmap_scanme.txt scanme.nmap.org -->
+<nmaprun scanner="nmap" args="nmap -4 -p 22,80,9929,31337 -sV -&#45;script=banner -&#45;host-timeout 150s -oX recon/tests/fixtures/nmap_scanme.xml -oN recon/tests/fixtures/nmap_scanme.txt scanme.nmap.org" start="1780301057" startstr="Mon Jun  1 10:04:17 2026" version="7.94SVN" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="4" services="22,80,9929,31337"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="45.33.32.156" addrtype="ipv4"/>
+<hostnames>
+<hostname name="scanme.nmap.org" type="user"/>
+</hostnames>
+</hosthint>
+<host starttime="1780301057" endtime="1780301075"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<address addr="45.33.32.156" addrtype="ipv4"/>
+<hostnames>
+<hostname name="scanme.nmap.org" type="user"/>
+<hostname name="scanme.nmap.org" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="ssh" product="OpenSSH" version="6.6.1p1 Ubuntu 2ubuntu2.13" extrainfo="Ubuntu Linux; protocol 2.0" ostype="Linux" method="probed" conf="10"><cpe>cpe:/a:openbsd:openssh:6.6.1p1</cpe><cpe>cpe:/o:linux:linux_kernel</cpe></service><script id="banner" output="SSH-2.0-OpenSSH_6.6.1p1 Ubuntu-2ubuntu2.13"/></port>
+<port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="Apache httpd" version="2.4.7" extrainfo="(Ubuntu)" method="probed" conf="10"><cpe>cpe:/a:apache:http_server:2.4.7</cpe></service><script id="http-server-header" output="Apache/2.4.7 (Ubuntu)"><elem>Apache/2.4.7 (Ubuntu)</elem>
+</script></port>
+<port protocol="tcp" portid="9929"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="nping-echo" product="Nping echo" method="probed" conf="10"/><script id="banner" output="\x01\x01\x00\x18\xC6\xAE\xC9\x82j\x1D=\x09\x00\x00\x00\x00R\x96&#xa;g\xE2\x14\xFE\xD58\x8E\xEB\xFC\xE8&amp;\xDF\xF7\xC9\xE1\x87\x0D\x1F\x9E\...&#xa;"/></port>
+<port protocol="tcp" portid="31337"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="tcpwrapped" method="probed" conf="8"/></port>
+</ports>
+<times srtt="157695" rttvar="50647" to="360283"/>
+</host>
+<runstats><finished time="1780301075" timestr="Mon Jun  1 10:04:35 2026" summary="Nmap done at Mon Jun  1 10:04:35 2026; 1 IP address (1 host up) scanned in 18.12 seconds" elapsed="18.12" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>
