@@ -1,4 +1,4 @@
-import os, json, requests, time, random, datetime, subprocess
+import os, json, requests, time, random, datetime
 from typing import Optional, Union
 from .exceptions import WrongFileTypeException,InvalidConfigException,PathIsNoFileException
 from configparser import ConfigParser
@@ -259,41 +259,6 @@ def get_timestamp_now()->str:
         :return: string with the appropriate timestamp.
         """
         return format_unix_timestamp_to_html(round(time.time()))
-
-
-def execute_wget_command(url:str, filename:str, path:str, json_logger, ip:str, port:int):
-        """
-        function, that executes a wget command, for a url and with a filename.
-        :param url: The URL where the file for the wget is hosted
-        :type url: str
-        :param filename: The filename of the file
-        :type filename: str
-        :param path: the path where the file should be saved
-        :type path: str
-        :param json_logger: the logger
-        :type json_logger: JsonLogger
-        :param ip: the source IP-Adress
-        :type ip: str
-        :param port: the source port
-        :type port: int
-        """
-
-        filename = filename.split("/")[-1]
-        file_ext = f".{filename.split('.')[-1]}"
-        filename = filename.replace(file_ext, '')
-        final_path = f"{path}/{filename}-{str(int(time.time()))}{file_ext}"
-        command = f"wget {url} -O {final_path}"
-         
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
-        logging_dict = {
-                "wget_response": str(result.stdout),
-                "file": final_path,
-                "wget_url:": url
-        }
-
-        json_logger.log(eventid="honeypot_utils.execute_wget_command.downloaded_wget", content=logging_dict, ip=ip, port=port)
-        if result.returncode!=0:
-                json_logger.error(f"Command: '{command}' returned non-zero exit status {result.returncode}. Output: {result.stderr}", "execute_wget_command")
 
 
 def save_list_to_file(input_list:list[str], filepath:str):
