@@ -3,6 +3,16 @@ from utils.utils import load_var_from_config_and_validate
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 import requests, copy
+import urllib3
+
+# IoT devices very commonly serve self-signed or mismatched certificates, so the
+# crawler intentionally does not verify TLS (verify=False below). Silence the
+# resulting, expected warning instead of spamming it for every request.
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+REQUEST_TIMEOUT = 10      # seconds, applied to every crawl request
+MAX_CRAWL_DEPTH = 3       # link-following hops past the seed endpoints
+MAX_ENDPOINTS = 250       # hard cap on endpoints discovered per (ip, port)
 
 class ApiCrawler:
 
@@ -60,11 +70,19 @@ class ApiCrawler:
 
         return ret_dict
     
-    def _request_endpoints(self, endpoints:dict, ret_dict:dict, ip_address:str, port:int, output_path:str, service_version:str) -> dict:
+    def _request_endpoints(self, endpoints:dict, ret_dict:dict, ip_address:str, port:int, output_path:str, service_version:str, depth:int = 0) -> dict:
         """
         Request the endpoints from the IoT device.
+
+        ``depth`` tracks how many link-following hops we are past the seed
+        endpoints; recursion stops at ``MAX_CRAWL_DEPTH`` so a densely
+        cross-linked target cannot blow up the crawl (or the call stack).
         """
-        
+
+        if depth > MAX_CRAWL_DEPTH:
+            self.log.info(f'Max crawl depth ({MAX_CRAWL_DEPTH}) reached at {ip_address}:{port}, not following further links', method="recon.ApiCrawler._request_endpoints")
+            return ret_dict
+
         ret_dict.update(endpoints)
 
         for endpoint in endpoints.keys():
@@ -82,14 +100,16 @@ class ApiCrawler:
                     response = requests.get(
                         url=request_url,
                         data=data,
-                        verify=False
+                        verify=False,
+                        timeout=REQUEST_TIMEOUT
                     )
 
                 elif endpoint_dict['method'] == 'POST':
                     response = requests.post(
                         url=request_url,
                         data=data,
-                        verify=False
+                        verify=False,
+                        timeout=REQUEST_TIMEOUT
                     )
 
                 else:
@@ -129,16 +149,19 @@ class ApiCrawler:
                 if further_endpoints != []:
                     count = len(ret_dict.keys())
                     further_endpoints_dict = {}
-                    for endpoint in further_endpoints:
-                        if endpoint not in ret_dict.keys():
-                            further_endpoints_dict[endpoint] = {
+                    for new_endpoint in further_endpoints:
+                        if len(ret_dict) + len(further_endpoints_dict) >= MAX_ENDPOINTS:
+                            self.log.warn(f'Endpoint cap ({MAX_ENDPOINTS}) reached at {ip_address}:{port}, stopping discovery', method="recon.ApiCrawler._request_endpoints")
+                            break
+                        if new_endpoint not in ret_dict.keys():
+                            further_endpoints_dict[new_endpoint] = {
                                 'num': count,
                                 'method': 'GET',
                                 'expected_status_code': 200
                             }
                             count += 1
 
-                    self._request_endpoints(further_endpoints_dict, ret_dict, ip_address, port, output_path, service_version)
+                    self._request_endpoints(further_endpoints_dict, ret_dict, ip_address, port, output_path, service_version, depth=depth + 1)
 
 
 

@@ -161,11 +161,12 @@ class IotRecon:
 
         ip_addresses = literal_eval(self.config.get(section="Scan", option="ip_addresses"))
         
-        try: 
+        try:
             with open("/home/pro/data/endpoints.json", "r") as file:
                 endpoints = json.load(file)
         except Exception as e:
             self.log.error(f"Error during loading of endpoints.json: {str(e)}", method="recon.IotRecon.scan_from_config")
+            raise
 
         crawl_ports = literal_eval(self.config.get(section="Scan", option="crawl_ports"))
         excl_ports = literal_eval(self.config.get(section="Scan", option="excl_ports"))
