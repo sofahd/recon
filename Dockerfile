@@ -1,5 +1,4 @@
 FROM ubuntu:22.04
-ARG TOKEN
 ARG LOG_API
 
 # Set environment variables
@@ -23,7 +22,7 @@ RUN mkdir /home/pro/data
 RUN pip3 install setuptools \
     pyOpenSSL \
     beautifulsoup4 && \
-    pip3 install git+https://$TOKEN:x-oauth-basic@github.com/sofahd/sofahutils.git
+    pip3 install git+https://github.com/sofahd/sofahutils.git
 
 WORKDIR /home/pro
 
