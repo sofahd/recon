@@ -1,6 +1,6 @@
 from configparser import ConfigParser
 from typing import Optional, Union
-import subprocess, os, time, select, json
+import subprocess, os, time, select, json, tempfile
 import xml.etree.ElementTree as ET
 from sofahutils import load_var_from_config_and_validate, save_list_to_file
 from utils.exceptions import MasscanFailedException, NmapFailedException
@@ -23,6 +23,10 @@ class PortScan:
         self.config = config
 
         self.rate = load_var_from_config_and_validate(config=config, section='Masscan', option='rate')
+
+        # masscan/nmap scratch (input list + JSON/XML reports) is written here and removed
+        # after parsing. It lives on a tmpfs so the container root FS can stay read-only.
+        self._scratch_dir = tempfile.gettempdir()
 
     
 
@@ -69,8 +73,8 @@ class PortScan:
 
         self.log.info(f"Starting the initial Masscan with {len(ip_address)} IP-addresses, while excluding {len(excl_ports)} ports.", method="recon.PortScan._masscan")
         
-        input_file_path = os.getcwd() + "/masscan_input.txt"
-        masscan_output_path = os.getcwd() + "/masscan_out.json"
+        input_file_path = os.path.join(self._scratch_dir, "masscan_input.txt")
+        masscan_output_path = os.path.join(self._scratch_dir, "masscan_out.json")
 
         save_list_to_file(input_list=ip_address, filepath=input_file_path)
 
@@ -218,7 +222,7 @@ class PortScan:
         
         self.log.info(f"Starting nmap scan on {ip_address}:{port}!", method="recon.PortScan._nmap")
 
-        output_path = os.path.join(os.getcwd(), "nmap_out.xml")
+        output_path = os.path.join(self._scratch_dir, "nmap_out.xml")
 
         nmap = subprocess.run(
             ["nmap", ip_address, "--script=banner", "-sV", "-p", str(port), "-oX", output_path],

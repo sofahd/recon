@@ -11,3 +11,18 @@ The Reconnaissance Service (`recon`) is a specialized component of the SOFAH (Sp
 - **Port Scanning**: Identifies open ports on the target system to simulate in the honeypot.
 - **Service Identification**: Determines the services running behind open ports to tailor the honeypot's responses.
 - **Integration with ENNORM**: Seamlessly works with the ENrichment NORMalization (ENNORM) module to apply gathered data towards service configuration.
+
+## Configuration
+
+recon reads `data/config.ini`. At deploy time `ReconService.download_repo()` assembles
+this file for you; to run recon **standalone**, copy the documented template and edit it:
+
+```bash
+cp data/config.sample.ini data/config.ini
+```
+
+[`data/config.sample.ini`](data/config.sample.ini) lists every section and option recon
+needs — `[Masscan] rate`, `[Scan] ip_addresses/crawl_ports/excl_ports`, `[Utils] api_list`.
+recon validates these at startup (`IotRecon._validate_config`) and fails loudly with a clear
+message naming any missing entries, so a malformed config is caught immediately rather than
+partway through a scan.

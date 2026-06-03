@@ -1,7 +1,7 @@
 from iot_tools.port_scan import PortScan
 from iot_tools.api_crawler import ApiCrawler
 from iot_tools.ssl_cert_info_retriver import SslCertInfoRetriever
-from sofahutils import load_config
+from sofahutils import load_config, InvalidConfigException
 import json, copy
 from typing import Union, Optional
 from sofahutils import SofahLogger
@@ -11,6 +11,15 @@ class IotRecon:
     """
     Class used for Reconnaissance on IOT-devices.
     """
+
+    # Every section/option recon reads at runtime. Checked once at startup so a malformed
+    # or stub config fails loudly here instead of raising a confusing NoSectionError deep
+    # inside a scan (see IMPROVE-recon-robustness Finding 1).
+    _REQUIRED_CONFIG = {
+        "Masscan": ["rate"],
+        "Scan": ["ip_addresses", "crawl_ports", "excl_ports"],
+        "Utils": ["api_list"],
+    }
 
     def __init__(self, path:str, log_url:str):
         """
@@ -24,7 +33,27 @@ class IotRecon:
         """
 
         self.config = load_config(path)
+        self._validate_config()
         self.log = SofahLogger(url=log_url)
+
+    def _validate_config(self) -> None:
+        """
+        Assert every section/option recon needs is present, aggregating all misses into one
+        clear error instead of failing a single option at a time partway through a scan.
+
+        :raises InvalidConfigException: if any required section/option is absent.
+        """
+
+        missing = [
+            f"[{section}] {option}"
+            for section, options in self._REQUIRED_CONFIG.items()
+            for option in options
+            if not self.config.has_option(section, option)
+        ]
+        if missing:
+            raise InvalidConfigException(
+                "recon config is missing required entries: " + ", ".join(missing)
+            )
 
     
     def _port_scan(self, ip_address:Union[str, list[str]], excl_ports:list[int] = None) -> dict:

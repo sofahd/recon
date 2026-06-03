@@ -1,4 +1,3 @@
-from OpenSSL import SSL
 import socket
 from typing import Optional
 
@@ -38,11 +37,16 @@ class SslCertInfoRetriever:
         :type port: int
         :return: dict, containing the SSL certificate information.
         """
+        # pyOpenSSL is only needed when we actually open a TLS connection. Importing it lazily
+        # keeps the rest of recon (config validation, port scanning, crawling) importable and
+        # testable without the TLS stack installed.
+        from OpenSSL import SSL, crypto
+
         self.log.info(f'Retrieving SSL certificate information of {hostname}:{port}', method="recon.SslCertInfoRetriever.retrieve")
-        
+
         ret_dict = {}
         try:
-            context = SSL.Context(SSL.TLS_CLIENT_METHOD)  
+            context = SSL.Context(SSL.TLS_CLIENT_METHOD)
             conn = SSL.Connection(context, socket.socket()) 
             conn.connect((hostname,port))
             conn.set_connect_state()
@@ -65,6 +69,24 @@ class SslCertInfoRetriever:
                 ret_dict["version"] = cert.get_version()
                 ret_dict["not_before"] = cert.get_notBefore().decode()
                 ret_dict["not_after"] = cert.get_notAfter().decode()
+
+                # Extra material so cert_forge can clone the original more closely: SANs,
+                # signature algorithm and key type/size. All best-effort -- any field that
+                # can't be read is simply omitted, and the forge tolerates its absence.
+                try:
+                    ret_dict["signature_algorithm"] = cert.get_signature_algorithm().decode(errors="ignore")
+                except Exception:
+                    pass
+                try:
+                    pubkey = cert.get_pubkey()
+                    ret_dict["key_size"] = pubkey.bits()
+                    ret_dict["key_type"] = {crypto.TYPE_RSA: "RSA", crypto.TYPE_DSA: "DSA"}.get(pubkey.type(), "EC")
+                except Exception:
+                    pass
+                sans = self._extract_subject_alt_names(cert)
+                if sans:
+                    ret_dict["subject_alt_names"] = sans
+
                 self.log.info(f'Successfully retrieved SSL certificate information of {hostname}:{port}', method="recon.SslCertInfoRetriever.retrieve")
             else:
                 self.log.error(f'No certificate found for {hostname}:{port}', method="recon.SslCertInfoRetriever.retrieve")
@@ -77,5 +99,27 @@ class SslCertInfoRetriever:
                 conn.close()
             except:
                 pass
-        
+
         return ret_dict
+
+    def _extract_subject_alt_names(self, cert) -> list:
+        """
+        Pull the subjectAltName entries off an X509 cert as a list like
+        ``["DNS:device.local", "IP:192.0.2.10"]`` (pyOpenSSL renders IPs as "IP Address:",
+        which is normalised to "IP:" so cert_forge can parse them uniformly). Returns ``[]``
+        when the cert has no SAN extension.
+
+        :param cert: the peer X509 certificate
+        :return: list of "TYPE:value" SAN strings
+        :rtype: list
+        """
+
+        for i in range(cert.get_extension_count()):
+            ext = cert.get_extension(i)
+            if ext.get_short_name() == b"subjectAltName":
+                return [
+                    part.strip().replace("IP Address:", "IP:")
+                    for part in str(ext).split(",")
+                    if part.strip()
+                ]
+        return []
