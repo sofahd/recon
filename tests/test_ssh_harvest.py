@@ -80,6 +80,43 @@ def test_harvest_clones_command_output():
     assert "0.0.0.0:23" in data["commands"]["netstat"]
 
 
+# A `ps` snapshot taken over recon's own SSH session: the last rows are recon's footprint
+# (its login session, the shell wrapper, and the ps probe itself); the first two are genuine.
+_PS_WITH_RECON = (
+    "PID   USER     TIME  COMMAND\n"
+    "    1 root      0:00 sshd: /usr/sbin/sshd -D -e [listener] 0 of 10-100 startups\n"
+    "    7 root      0:00 /usr/sbin/telnetd -F\n"
+    "    8 root      0:00 sshd: root@notty\n"
+    "   44 root      0:00 ash -c ps aux 2>/dev/null || ps -ef 2>/dev/null || ps\n"
+    "   45 root      0:00 ps aux\n"
+)
+
+
+def test_ps_scrub_removes_recon_footprint_keeps_real_processes():
+    run = lambda cmd: _PS_WITH_RECON if cmd.startswith("ps ") else ""  # noqa: E731
+    ps = SshHarvester(run=run).harvest()["commands"]["ps"]
+    # recon's own footprint is gone
+    assert "ps aux" not in ps
+    assert "ps -ef" not in ps
+    assert "root@notty" not in ps
+    # the device's real processes survive, including the listening sshd daemon and telnetd
+    assert "[listener]" in ps
+    assert "/usr/sbin/telnetd" in ps
+    assert ps.splitlines()[0].startswith("PID")  # header kept
+
+
+def test_scrub_is_conservative_about_unrelated_processes():
+    # processes that merely contain "ps" or " -c " but aren't recon's must be kept
+    sample = (
+        "  PID USER COMMAND\n"
+        "  100 root /usr/sbin/cupsd -f\n"
+        "  101 root /bin/sh -c /opt/app/watchdog.sh\n"
+        "  102 root [kpsmoused]\n"
+    )
+    out = SshHarvester(run=lambda c: "")._scrub_recon_processes(sample)
+    assert "cupsd" in out and "watchdog.sh" in out and "kpsmoused" in out
+
+
 def test_harvest_file_size_cap():
     huge = "A" * 5000
     harvester = SshHarvester(run=lambda cmd: huge if cmd.startswith("cat /etc/passwd") else "",

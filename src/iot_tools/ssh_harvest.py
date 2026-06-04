@@ -14,6 +14,7 @@ logic is unit-testable with a stub runner and recon imports without paramiko pre
 **Safety:** every command issued is strictly READ-ONLY (``uname``/``cat``/``ls``/``ps``/...).
 Nothing here writes to, modifies, or executes anything on the target device.
 """
+import re
 
 
 # Identity/config files worth cloning. cat is attempted for each; unreadable ones (e.g.
@@ -140,7 +141,46 @@ class SshHarvester:
             output = self._safe(command, strip=False)
             if output:
                 commands[name] = output
+        # recon harvests `ps` over its own SSH session, so the snapshot catches recon's probe
+        # (the `ps` invocation, its shell wrapper, and the login session). Scrub those so the
+        # pot doesn't replay them -- a stale `ps aux` / `sshd: root@notty` row is a clone tell.
+        if "ps" in commands:
+            commands["ps"] = self._scrub_recon_processes(commands["ps"])
         return commands
+
+    def _scrub_recon_processes(self, ps_output):
+        """Drop the rows of a cloned ``ps`` that belong to recon's own harvest session, keeping
+        every genuine device process (including the listening sshd daemon). Conservative: a row
+        is only removed when it clearly matches one of recon's own commands or login session."""
+        issued = self._issued_commands()
+        ps_variants = [segment.replace("2>/dev/null", "").strip()
+                       for segment in HARVEST_COMMANDS["ps"].split("||")]
+
+        kept = []
+        for line in ps_output.splitlines():
+            stripped = line.rstrip()
+            # the `<shell> -c "<cmd>"` wrapper recon spawned to run a harvest command
+            if " -c " in stripped and any(cmd and cmd in stripped for cmd in issued):
+                continue
+            # the leaf `ps` probe itself, after the `|| ...` fallback chain resolved
+            if any(stripped.endswith(" " + variant) or stripped.endswith("\t" + variant)
+                   for variant in ps_variants):
+                continue
+            # the interactive SSH login session recon opened -- but NOT the listening daemon
+            if "sshd:" in stripped and "[listener]" not in stripped \
+                    and ("@notty" in stripped or re.search(r"@pts/\d", stripped)):
+                continue
+            kept.append(line)
+        return "\n".join(kept)
+
+    @staticmethod
+    def _issued_commands():
+        """Every command string recon issues during a harvest -- used to recognise recon's own
+        shell-wrapper processes in a captured `ps`."""
+        return (list(HARVEST_COMMANDS.values())
+                + [f"cat {path}" for path in HARVEST_FILES]
+                + [f"ls -la {directory}" for directory in HARVEST_DIRS]
+                + ["uname -a", "uname -m", "uname -n", "hostname", "whoami"])
 
     # -- helpers ------------------------------------------------------------------------
 
