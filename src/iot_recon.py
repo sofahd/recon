@@ -1,6 +1,7 @@
 from iot_tools.port_scan import PortScan
 from iot_tools.api_crawler import ApiCrawler
 from iot_tools.ssl_cert_info_retriver import SslCertInfoRetriever
+from iot_tools.ssh_harvest import ssh_credentials_from_config
 from sofahutils import load_config, InvalidConfigException
 import json, copy
 from typing import Union, Optional
@@ -89,10 +90,69 @@ class IotRecon:
         """
 
         api_crawler = ApiCrawler(config=self.config, logger=self.log)
-        
+
         return api_crawler.crawl(ip_address=ip_address, port=port, endpoints=endpoints, output_path=output_path, service_version=service_version)
-    
-    
+
+
+    @staticmethod
+    def _is_ssh_port(port_data:dict) -> bool:
+        """
+        Decide whether a scanned port speaks SSH, from nmap's service name (``ssh``) or the
+        RFC 4253 identification banner (``SSH-<proto>-<software>``). Kept identical to
+        EnNorm._is_ssh so recon and the normalizer agree on what an SSH service is.
+
+        :param port_data: one port's scan result (``service_version``, ``banner``, ...).
+        :type port_data: dict
+        :return: True if the port is SSH.
+        :rtype: bool
+        """
+
+        service_version = (port_data.get("service_version") or "").lower()
+        banner = port_data.get("banner") or ""
+        return "ssh" in service_version or banner.startswith("SSH-")
+
+
+    def _ssh_recon(self, ip_address:str, port) -> Optional[dict]:
+        """
+        Run a deep SSH harvest against ``ip_address:port`` IF credentials are configured.
+
+        Credentials are OPTIONAL: with no ``[Ssh]`` section (or harvest disabled / no
+        username) this returns ``None`` and recon keeps only the SSH banner. paramiko is
+        imported lazily here so recon imports fine on hosts without it. The harvest only ever
+        issues read-only commands, and any failure degrades to ``None`` (banner-only) rather
+        than aborting the scan.
+
+        :param ip_address: the SSH host.
+        :type ip_address: str
+        :param port: the SSH port.
+        :return: the harvest dict (persona/files/listings/commands/banner) or None.
+        :rtype: Optional[dict]
+        """
+
+        credentials = ssh_credentials_from_config(self.config)
+        if not credentials:
+            return None
+
+        self.log.info(f"Credentials provided -- starting deep SSH harvest on {ip_address}:{port}", method="recon.IotRecon._ssh_recon")
+        try:
+            from iot_tools.ssh_recon import SshRecon  # lazy: keep recon importable without paramiko
+            ssh_recon = SshRecon(
+                host=ip_address, port=port,
+                username=credentials["username"], password=credentials["password"],
+                key_file=credentials["key_file"], timeout=credentials["timeout"], logger=self.log,
+            )
+            data = ssh_recon.harvest()
+            self.log.info(
+                f"SSH harvest on {ip_address}:{port} captured {len(data.get('files', {}))} files, "
+                f"{len(data.get('listings', {}))} dir listings, {len(data.get('commands', {}))} commands",
+                method="recon.IotRecon._ssh_recon",
+            )
+            return data
+        except Exception as e:
+            self.log.warn(f"SSH harvest failed for {ip_address}:{port}: {str(e)}", method="recon.IotRecon._ssh_recon")
+            return None
+
+
     def scan(self,
              ip_address:Union[str, list[str]],
              endpoints:dict,
@@ -168,6 +228,10 @@ class IotRecon:
                 if "ssl" in service_version:
                     ssl_cert_retriever = SslCertInfoRetriever(logger=self.log)
                     port_scan_res[ip][port]["ssl"] = ssl_cert_retriever.process(ip_address=ip, port=port)
+                if self._is_ssh_port(port_scan_res[ip][port]):
+                    ssh_data = self._ssh_recon(ip_address=ip, port=port)
+                    if ssh_data:
+                        port_scan_res[ip][port]["ssh"] = ssh_data
         
         if save_output:
             for ip in port_scan_res.keys():

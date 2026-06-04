@@ -22,7 +22,8 @@ RUN apt -y update && \
 RUN mkdir /home/pro/data
 RUN pip3 install setuptools \
     pyOpenSSL \
-    beautifulsoup4 && \
+    beautifulsoup4 \
+    paramiko && \
     pip3 install git+https://github.com/sofahd/sofahutils.git
 
 # Drop root: recon runs as an unprivileged user. masscan brings its own TCP/IP stack and
